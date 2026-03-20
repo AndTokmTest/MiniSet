@@ -191,7 +191,6 @@ int main(const int argc,
 
     simpleTest();
 
-
     return EXIT_SUCCESS;
 }
 
