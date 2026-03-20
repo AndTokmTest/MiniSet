@@ -15,28 +15,33 @@ Description : Tests C++ project
 
 namespace
 {
-    namespace bit_utils
-    {
-        [[nodiscard]]
-        constexpr bool isSet(const uint16_t mask, const uint16_t index) noexcept {
-            return mask & (1u << index);
-        }
+    constexpr uint8_t charBit { 8 };
+    constexpr uint16_t maxValue { sizeof(uint16_t) * charBit };
 
-        [[nodiscard]]
-        constexpr bool isNotSet(const uint16_t mask, const uint16_t index) noexcept {
-            return !isSet(mask, index);
-        }
+    [[nodiscard]]
+    constexpr bool is_set(const uint16_t mask, const uint16_t index) noexcept {
+        return index < maxValue && (mask & (1u << index));
+    }
 
-        constexpr void unsetBit(uint16_t& mask, const uint16_t bit) noexcept {
-            mask &= ~(1 << bit);
-        };
+    [[nodiscard]]
+    constexpr bool is_not_set(const uint16_t mask, const uint16_t index) noexcept {
+        return !is_set(mask, index);
+    }
 
-        constexpr void setBit(uint16_t& mask, const uint16_t bit) noexcept {
+    constexpr void unset_bit(uint16_t& mask, const uint16_t bit) noexcept {
+        mask &= ~(1 << bit);
+    };
+
+    constexpr void set_bit(uint16_t& mask, const uint16_t bit) noexcept {
+        if (bit < maxValue) {
             mask |= (1 << bit);
         }
     }
+}
 
 
+namespace
+{
     struct Iterator
     {
         using index_type = uint16_t;
@@ -46,7 +51,7 @@ namespace
         constexpr Iterator(const mask_type msk, const index_type startIndex, const index_type endIndex):
             mask { msk }, idx { startIndex }, endIdx { endIndex }
         {
-            while (isNotSet(idx)) {
+            while (idx < endIdx && isNotSet(idx)) {
                 ++idx;
             }
         }
@@ -55,7 +60,7 @@ namespace
         {
             do {
                 ++idx;
-            } while (isNotSet(idx));
+            } while (idx < endIdx && isNotSet(idx));
             return *this;
         }
 
@@ -64,8 +69,13 @@ namespace
         }
 
         [[nodiscard]]
-        constexpr bool operator!=(const Iterator &other) const noexcept {
-            return idx != other.idx;
+        constexpr bool operator==(const Iterator& other) const noexcept {
+            return idx == other.idx;
+        }
+
+        [[nodiscard]]
+        constexpr bool operator!=(const Iterator& other) const noexcept {
+            return !(*this == other);
         }
 
     private:
@@ -82,13 +92,13 @@ namespace
         [[nodiscard]]
         constexpr bool isSet(const index_type index) const noexcept
         {
-            return endIdx > index && bit_utils::isSet(mask, index);
+            return endIdx > index && is_set(mask, index);
         }
 
         [[nodiscard]]
         constexpr bool isNotSet(const index_type index) const noexcept
         {
-            return endIdx > index && !bit_utils::isSet(mask, index);
+            return !isSet(index);
         }
     };
 
@@ -102,21 +112,24 @@ namespace
 
         void insert(const value_type val)
         {
-            bit_utils::setBit(mask, val);
-            size = std::max(size, static_cast<size_type>(val + 1));
+            if (val >= maxValue) {
+                return;
+            }
+            set_bit(mask, val);
+            size = std::max(size, static_cast<size_type>(val + 1));            
         }
 
         constexpr void erase(const value_type val)
         {
-            bit_utils::unsetBit(mask, val);
-            while (size > 0 && bit_utils::isNotSet(mask, size - 1)) {
+            unset_bit(mask, val);
+            while (size > 0 && is_not_set(mask, size - 1)) {
                 --size;
             }
         }
 
         [[nodiscard]]
         constexpr bool contains(const value_type val) const noexcept {
-            return bit_utils::isSet(mask, val);
+            return is_set(mask, val);
         }
 
         [[nodiscard]]
@@ -131,13 +144,11 @@ namespace
 
     private:
 
-        static constexpr uint8_t charBit { 8 };
-        static constexpr uint8_t maxSize { sizeof(size_type) * charBit };
-
         value_type mask { 0 };
         size_type size { 0 };
     };
 
+    [[maybe_unused]]
     std::ostream& operator<<(std::ostream& os, const Set& set)
     {
         for (const auto i : set)
