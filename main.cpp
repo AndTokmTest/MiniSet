@@ -47,61 +47,57 @@ namespace
 {
     struct Iterator
     {
-        using index_type = uint16_t;
         using value_type = uint16_t;
         using mask_type  = uint16_t;
 
-        constexpr Iterator(const mask_type msk, const index_type startIndex, const index_type endIndex):
-            mask { msk }, idx { startIndex }, endIdx { endIndex }
-        {
-            while (idx < endIdx && isNotSet(idx)) {
-                ++idx;
-            }
+        constexpr explicit Iterator(const mask_type mask) noexcept: remainingMask { mask } {
+            updateIndex();
         }
 
         constexpr Iterator& operator++() noexcept
         {
-            do {
-                ++idx;
-            } while (idx < endIdx && isNotSet(idx));
+            if (remainingMask == 0)
+                return *this;
+
+            // Remove current bit
+            remainingMask &= (remainingMask - 1);
+
+            updateIndex();
             return *this;
         }
 
-        constexpr value_type operator*() const noexcept {
-            return idx;
+        constexpr value_type operator*() const noexcept
+        {
+            return currentIndex;
         }
 
         [[nodiscard]]
-        constexpr bool operator==(const Iterator& other) const noexcept {
-            return idx == other.idx;
+        constexpr bool operator==(const Iterator& other) const noexcept
+        {
+            return remainingMask == other.remainingMask;
         }
 
         [[nodiscard]]
-        constexpr bool operator!=(const Iterator& other) const noexcept {
+        constexpr bool operator!=(const Iterator& other) const noexcept
+        {
             return !(*this == other);
         }
 
     private:
-        /** **/
-        mask_type  mask { 0 };
 
-        /** **/
-        index_type idx { 0 };
+        mask_type remainingMask { 0 };
+        value_type currentIndex { 0 };
 
-        /** Index of the element after the last one: --> { size + 1 } **/
-        index_type endIdx { 0 };
-
-
-        [[nodiscard]]
-        constexpr bool isSet(const index_type index) const noexcept
+        constexpr void updateIndex() noexcept
         {
-            return endIdx > index && is_set(mask, index);
-        }
-
-        [[nodiscard]]
-        constexpr bool isNotSet(const index_type index) const noexcept
-        {
-            return !isSet(index);
+            if (remainingMask == 0)
+                return;
+            if constexpr (__cpp_lib_bitops >= 201907L) {
+                currentIndex = std::countr_zero(remainingMask);
+            }
+            else {
+                currentIndex = __builtin_ctz(remainingMask);
+            }
         }
     };
 
@@ -119,14 +115,20 @@ namespace
                 return;
             }
             set_bit(mask, val);
-            size = std::max(size, static_cast<size_type>(val + 1));            
         }
 
-        constexpr void erase(const value_type val)
-        {
+        constexpr void erase(const value_type val) {
             unset_bit(mask, val);
-            while (size > 0 && is_not_set(mask, size - 1)) {
-                --size;
+        }
+
+        [[nodiscard]]
+        constexpr size_type size() const noexcept
+        {
+            if constexpr (__cpp_lib_bitops >= 201907L) {
+                return std::popcount(mask);
+            }
+            else {
+                return __builtin_popcount(mask);
             }
         }
 
@@ -137,18 +139,17 @@ namespace
 
         [[nodiscard]]
         constexpr Iterator begin() const noexcept {
-            return Iterator { mask, 0, size };
+            return Iterator { mask };
         }
 
         [[nodiscard]]
         constexpr Iterator end() const noexcept {
-            return Iterator { mask, size, size };
+            return Iterator { 0 };
         }
 
     private:
 
         value_type mask { 0 };
-        size_type size { 0 };
     };
 
     [[maybe_unused]]
@@ -178,6 +179,7 @@ void simpleTest()
         assert(data1[idx++] == i);
     }
 
+    assert(3 == set.size());
     set.erase(8);
 
     for (int v: data2) {
@@ -186,6 +188,8 @@ void simpleTest()
     for (uint32_t idx = 0; const auto i : set) {
         assert(data2[idx++] == i);
     }
+
+    assert(2 == set.size());
 }
 
 int main(const int argc,
