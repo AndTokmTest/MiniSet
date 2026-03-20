@@ -16,11 +16,12 @@ Description : Tests C++ project
 namespace
 {
     constexpr uint8_t charBit { 8 };
+    constexpr uint16_t uintOne { 1 };
     constexpr uint16_t maxValue { sizeof(uint16_t) * charBit };
 
     [[nodiscard]]
     constexpr bool is_set(const uint16_t mask, const uint16_t index) noexcept {
-        return index < maxValue && (mask & (1u << index));
+        return index < maxValue && (mask & (uintOne << index));
     }
 
     [[nodiscard]]
@@ -29,12 +30,14 @@ namespace
     }
 
     constexpr void unset_bit(uint16_t& mask, const uint16_t bit) noexcept {
-        mask &= ~(1 << bit);
+        if (bit < maxValue) {
+            mask &= ~(uintOne << bit);
+        }
     };
 
     constexpr void set_bit(uint16_t& mask, const uint16_t bit) noexcept {
         if (bit < maxValue) {
-            mask |= (1 << bit);
+            mask |= (uintOne << bit);
         }
     }
 }
@@ -160,6 +163,7 @@ namespace
 
 void simpleTest()
 {
+    
     constexpr std::array<int, 3> data1 {2, 8, 12};
     constexpr std::array<int, 2> data2 {2, 12};
 
